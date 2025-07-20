@@ -15,7 +15,7 @@ const app = express();
 // ⚠️ Put CORS config BEFORE routes
 app.use(
   cors({
-    origin: ["http://127.0.0.1:5500", "http://[::]:8080"], // Match Live Server or your frontend URL
+    origin: ["http://127.0.0.1:5500", process.env.FRONTEND_URL], // Match Live Server or your frontend URL
     credentials: true,
   })
 );

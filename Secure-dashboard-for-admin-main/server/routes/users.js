@@ -28,7 +28,7 @@ router.post("/", verifyToken, async (req, res) => {
       username: email,
     });
     await admin.save();
-    let url = `http://[::]:8080/reset.html?token=${password}&email=${email}`;
+    let url = `${process.env.FRONTEND_URL}/reset.html?token=${password}&email=${email}`;
     await sendEmail({
       to: email,
       subject: "Invite User",
