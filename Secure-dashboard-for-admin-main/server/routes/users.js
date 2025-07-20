@@ -1,58 +1,73 @@
-const express = require('express');
+const bcrypt = require("bcryptjs");
+const express = require("express");
 const router = express.Router();
-const verifyToken = require('../middlewares/authMiddleware');
-const User = require('../models/user');
+const verifyToken = require("../middlewares/authMiddleware");
+const Admin = require("../models/Admin");
+const sendEmail = require("../middlewares/email");
 
-// GET /api/users (only for admins)
-router.get('/', verifyToken, async (req, res) => {
+// GET /api/users
+router.get("/current", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ msg: 'Access denied' });
-    }
-    const users = await User.find({}, '-password'); // exclude password
+    const user = await Admin.findById(req.user.id, "-password");
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ msg: "Error fetching users", error: err.message });
+  }
+});
+
+router.post("/", verifyToken, async (req, res) => {
+  try {
+    const { email } = req.body;
+    const password = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const hashed = await bcrypt.hash(password, 10);
+    const admin = new Admin({
+      email,
+      password: hashed,
+      isActive: false,
+      username: email,
+    });
+    await admin.save();
+    let url = `http://[::]:8080/reset.html?token=${password}&email=${email}`;
+    await sendEmail({
+      to: email,
+      subject: "Invite User",
+      html: `Click the link below to proceed ${url}`,
+    });
+    res.status(201).json({ message: "Admin created successfully", email });
+  } catch (err) {
+    res.status(500).json({ msg: "Error fetching users", error: err.message });
+  }
+});
+
+router.get("/", verifyToken, async (req, res) => {
+  try {
+    const users = await Admin.find().sort({ isActive: -1 }).select("-password");
     res.json(users);
   } catch (err) {
-    res.status(500).json({ msg: 'Error fetching users', error: err.message });
+    res.status(500).json({ msg: "Error fetching users", error: err.message });
   }
 });
 
-// PUT /api/users/:id (only for admins)
-router.put('/:id', verifyToken, async (req, res) => {
+router.get("/count", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ msg: 'Access denied' });
-    }
-    const userId = req.params.id;
-    const { username, role } = req.body;
-
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { username, role },
-      { new: true, select: '-password' }
-    );
-    if (!updatedUser) {
-      return res.status(404).json({ msg: 'User not found' });
-    }
-    res.json({ msg: 'User updated', user: updatedUser });
+    const count = await Admin.countDocuments();
+    res.json({ count });
   } catch (err) {
-    res.status(500).json({ msg: 'Error updating user', error: err.message });
+    res.status(500).json({ msg: "Error fetching users", error: err.message });
   }
 });
 
-// DELETE /api/users/:id (only for admins)
-router.delete('/:id', verifyToken, async (req, res) => {
+router.delete("/:id", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ msg: 'Access denied' });
-    }
     const userId = req.params.id;
-    const deletedUser = await User.findByIdAndDelete(userId);
+    const deletedUser = await Admin.findByIdAndDelete(userId);
     if (!deletedUser) {
-      return res.status(404).json({ msg: 'User not found' });
+      return res.status(404).json({ msg: "User not found" });
     }
-    res.json({ msg: 'User deleted' });
+    res.json({ msg: "User deleted" });
   } catch (err) {
-    res.status(500).json({ msg: 'Error deleting user', error: err.message });
+    res.status(500).json({ msg: "Error deleting user", error: err.message });
   }
 });
 
